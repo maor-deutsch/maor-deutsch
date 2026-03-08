@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Prime Minister's Chair - AI Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #38bdf8;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --bg-dark: #020617;
+            --panel: #1e293b;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: rgba(56, 189, 248, 0.1);
+            position: absolute;
+            top: 0;
+            z-index: 10;
+            animation: scan 4s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .map-container {
+            background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+            position: relative;
+        }
+
+        .map-point {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(3); opacity: 0; }
+        }
+
+        .terminal-text {
+            border-left: 2px solid var(--primary);
+            padding-left: 10px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            animation: slideIn 0.2s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        .ai-loading {
+            display: inline-block;
+            width: 4px;
+            height: 14px;
+            background: var(--primary);
+            animation: blink 0.8s infinite;
+        }
+
+        @keyframes blink { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col p-2 md:p-4">
+    <div class="scanline pointer-events-none"></div>
+
+    <!-- Stats Bar -->
+    <nav class="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+        <div class="glass p-2 rounded">
+            <span class="text-[10px] uppercase text-slate-400 font-bold">Coalition Seats</span>
+            <div class="flex items-center gap-2">
+                <span id="stat-seats" class="text-xl font-black text-emerald-400">64</span>
+                <span class="text-xs text-slate-500">/ 120</span>
+            </div>
+            <div class="w-full bg-slate-800 h-1 rounded-full mt-1 overflow-hidden">
+                <div id="bar-seats" class="bg-emerald-400 h-full transition-all duration-500" style="width: 53%"></div>
+            </div>
+        </div>
+        <div class="glass p-2 rounded">
+            <span class="text-[10px] uppercase text-slate-400 font-bold">Public Morale</span>
+            <span id="stat-morale" class="text-xl font-black text-sky-400">85%</span>
+            <div class="w-full bg-slate-800 h-1 rounded-full mt-1 overflow-hidden">
+                <div id="bar-morale" class="bg-sky-400 h-full transition-all duration-500" style="width: 85%"></div>
+            </div>
+        </div>
+        <div class="glass p-2 rounded">
+            <span class="text-[10px] uppercase text-slate-400 font-bold">War Treasury</span>
+            <span id="stat-budget" class="text-xl font-black text-yellow-500">$12.5B</span>
+            <div class="w-full bg-slate-800 h-1 rounded-full mt-1 overflow-hidden">
+                <div id="bar-budget" class="bg-yellow-500 h-full transition-all duration-500" style="width: 60%"></div>
+            </div>
+        </div>
+        <div class="glass p-2 rounded">
+            <span class="text-[10px] uppercase text-slate-400 font-bold">Legitimacy</span>
+            <span id="stat-intl" class="text-xl font-black text-purple-400">70%</span>
+            <div class="w-full bg-slate-800 h-1 rounded-full mt-1 overflow-hidden">
+                <div id="bar-intl" class="bg-purple-400 h-full transition-all duration-500" style="width: 70%"></div>
+            </div>
+        </div>
+        <div class="glass p-2 rounded border-sky-500/30 flex flex-col justify-center">
+            <span class="text-[10px] uppercase text-sky-400 font-bold">Operation Day</span>
+            <span id="stat-day" class="text-xl font-black text-white mono">001</span>
+        </div>
+    </nav>
+
+    <main class="flex-grow grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
+        <!-- Left: Map & Tactical -->
+        <div class="lg:col-span-4 glass rounded-xl overflow-hidden relative map-container flex flex-col">
+            <div class="p-3 bg-slate-900/80 border-b border-white/10 flex justify-between items-center z-20">
+                <h2 class="text-xs font-bold tracking-widest uppercase text-slate-300">Tactical Map</h2>
+            </div>
+            <div id="game-map" class="flex-grow relative flex items-center justify-center p-4">
+                <svg viewBox="0 0 400 500" class="w-full h-full opacity-40">
+                    <path d="M200,50 L250,100 L230,200 L280,250 L260,400 L200,480 L140,400 L120,250 L170,200 L150,100 Z" fill="none" stroke="#38bdf8" stroke-width="2"/>
+                </svg>
+                <!-- Dynamic Points -->
+                <div id="intel-marker" class="map-point bg-yellow-400 hidden"></div>
+                <div class="map-point bg-red-500" style="top: 20%; left: 50%;"></div>
+                <div class="map-point bg-orange-500" style="top: 75%; left: 45%;"></div>
+            </div>
+            <div class="p-4 grid grid-cols-2 gap-2 z-20">
+                <button onclick="orderStrike('precise')" class="glass hover:bg-red-500/20 p-2 rounded text-[10px] font-bold uppercase border-red-500/50">Precise Strike</button>
+                <button onclick="orderStrike('recon')" class="glass hover:bg-sky-500/20 p-2 rounded text-[10px] font-bold uppercase border-sky-500/50">Drone Recon</button>
+            </div>
+        </div>
+
+        <!-- Center: AI Diplomacy Terminal -->
+        <div class="lg:col-span-5 flex flex-col gap-4 overflow-hidden">
+            <div class="glass rounded-xl flex-grow flex flex-col overflow-hidden border-purple-500/20">
+                <div class="p-3 bg-purple-900/20 border-b border-purple-500/20 flex justify-between items-center">
+                    <h2 class="text-xs font-bold tracking-widest uppercase text-purple-300">Global Comms Terminal</h2>
+                    <span class="text-[10px] text-purple-400 mono">AI DIPLOMACY ACTIVE</span>
+                </div>
+                
+                <div id="comms-display" class="flex-grow overflow-y-auto p-4 space-y-4 text-sm mono">
+                    <div class="text-slate-500 italic">Select a contact to initiate diplomatic channel...</div>
+                </div>
+
+                <div class="p-4 bg-slate-900/50 border-t border-white/5">
+                    <div class="flex gap-2 mb-3 overflow-x-auto pb-2 no-scrollbar">
+                        <button onclick="setContact('White House')" class="contact-btn whitespace-nowrap px-3 py-1 rounded-full bg-slate-800 text-[10px] border border-white/10">US President</button>
+                        <button onclick="setContact('UN Sec-Gen')" class="contact-btn whitespace-nowrap px-3 py-1 rounded-full bg-slate-800 text-[10px] border border-white/10">UN Sec-Gen</button>
+                        <button onclick="setContact('Regional Neighbor')" class="contact-btn whitespace-nowrap px-3 py-1 rounded-full bg-slate-800 text-[10px] border border-white/10">Regional King</button>
+                    </div>
+                    <div class="flex gap-2">
+                        <textarea id="ai-input" placeholder="Type diplomatic message..." class="flex-grow bg-black/40 border border-white/10 rounded-lg p-2 text-sm focus:outline-none focus:border-purple-500 h-12 resize-none"></textarea>
+                        <button id="send-btn" onclick="sendDiplomaticMessage()" class="bg-purple-600 hover:bg-purple-500 px-4 rounded-lg font-bold text-xs transition-all">SEND</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Cabinet & Logs -->
+        <div class="lg:col-span-3 flex flex-col gap-4 overflow-hidden">
+            <div class="glass rounded-xl p-4 flex flex-col h-1/2 overflow-hidden border-sky-500/20">
+                <h2 class="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Intelligence</h2>
+                <div id="intel-logs" class="flex-grow overflow-y-auto mono text-[10px] space-y-1 pr-1">
+                    <div class="terminal-text text-sky-400">War Room V2.5-AI Online.</div>
+                </div>
+            </div>
+            <div class="glass rounded-xl p-4 flex flex-col h-1/2 overflow-hidden">
+                <button onclick="nextDay()" class="w-full bg-sky-600 hover:bg-sky-500 text-white py-3 rounded-lg font-bold text-sm mb-4 transition-all shadow-lg shadow-sky-500/20">END STRATEGIC DAY</button>
+                <h2 class="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Cabinet Advice</h2>
+                <div id="cabinet-container" class="flex-grow overflow-y-auto space-y-2 pr-1">
+                    <p class="text-[10px] text-slate-500 italic">Awaiting daily briefing...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Overlays -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black/80 z-[100] hidden flex items-center justify-center p-4">
+        <div class="glass max-w-lg w-full p-8 rounded-2xl border-sky-500/50 shadow-2xl">
+            <h2 id="modal-title" class="text-2xl font-black text-sky-400 mb-2 uppercase">Emergency</h2>
+            <p id="modal-description" class="text-slate-300 mb-6"></p>
+            <div id="modal-actions" class="flex flex-col gap-3"></div>
+        </div>
+    </div>
+
+    <div id="game-over" class="fixed inset-0 bg-slate-950 z-[200] hidden flex flex-col items-center justify-center p-8 text-center">
+        <h1 class="text-6xl font-black text-red-500 mb-2">TERM TERMINATED</h1>
+        <p id="game-over-reason" class="text-xl text-slate-400 mb-8 max-w-xl"></p>
+        <button onclick="location.reload()" class="bg-white text-black px-12 py-4 rounded-full font-black uppercase tracking-widest">Restart</button>
+    </div>
+
+    <script>
+        const apiKey = ""; // Set by environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'pm-chair-v2';
+
+        const state = {
+            day: 1,
+            seats: 64,
+            morale: 85,
+            budget: 12.5,
+            intl: 70,
+            isGameOver: false,
+            currentContact: null,
+            reconActive: false,
+            awaitingAI: false
+        };
+
+        const logs = document.getElementById('intel-logs');
+        const comms = document.getElementById('comms-display');
+        const aiInput = document.getElementById('ai-input');
+
+        function updateUI() {
+            document.getElementById('stat-day').innerText = String(state.day).padStart(3, '0');
+            document.getElementById('stat-seats').innerText = state.seats;
+            document.getElementById('stat-morale').innerText = Math.round(state.morale) + '%';
+            document.getElementById('stat-budget').innerText = '$' + state.budget.toFixed(1) + 'B';
+            document.getElementById('stat-intl').innerText = Math.round(state.intl) + '%';
+            
+            document.getElementById('bar-seats').style.width = `${(state.seats / 120) * 100}%`;
+            document.getElementById('bar-morale').style.width = `${state.morale}%`;
+            document.getElementById('bar-budget').style.width = `${(state.budget / 20) * 100}%`;
+            document.getElementById('bar-intl').style.width = `${state.intl}%`;
+
+            if (state.seats < 61) endGame("Coalition collapsed.");
+            if (state.morale <= 0) endGame("Social collapse.");
+            if (state.budget <= 0) endGame("Economic default.");
+        }
+
+        function addLog(text, type = 'slate') {
+            const entry = document.createElement('div');
+            entry.className = `terminal-text text-${type}-400`;
+            entry.innerText = text;
+            logs.prepend(entry);
+        }
+
+        function setContact(name) {
+            state.currentContact = name;
+            document.querySelectorAll('.contact-btn').forEach(b => {
+                b.classList.toggle('border-purple-500', b.innerText.includes(name));
+                b.classList.toggle('bg-purple-900/40', b.innerText.includes(name));
+            });
+            comms.innerHTML += `<div class="text-purple-400 mt-4">--- SECURE CHANNEL TO ${name.toUpperCase()} OPENED ---</div>`;
+            comms.scrollTop = comms.scrollHeight;
+        }
+
+        async function sendDiplomaticMessage() {
+            if (!state.currentContact || !aiInput.value.trim() || state.awaitingAI) return;
+            
+            const userMsg = aiInput.value.trim();
+            aiInput.value = "";
+            state.awaitingAI = true;
+            
+            comms.innerHTML += `<div class="text-white mt-2">PM: ${userMsg}</div>`;
+            const loadingId = 'loading-' + Date.now();
+            comms.innerHTML += `<div id="${loadingId}" class="text-purple-400 mt-1">Decrypting response<span class="ai-loading ml-1"></span></div>`;
+            comms.scrollTop = comms.scrollHeight;
+
+            const systemPrompt = `You are playing a grand strategy game as the ${state.currentContact}. 
+            The player is the Prime Minister of Israel during a war. 
+            Stats: Seats:${state.seats}, Morale:${state.morale}%, Budget:${state.budget}B, Legitimacy:${state.intl}%.
+            Evaluate their message. Be realistic, political, and firm.
+            Respond in JSON format: { "reply": "string", "seatsChange": number, "moraleChange": number, "budgetChange": number, "intlChange": number, "log": "short event log" }`;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userMsg }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+                
+                const data = await response.json();
+                const result = JSON.parse(data.candidates[0].content.parts[0].text);
+                
+                document.getElementById(loadingId).remove();
+                comms.innerHTML += `<div class="text-purple-300 mt-2 font-bold">${state.currentContact.toUpperCase()}:</div>`;
+                comms.innerHTML += `<div class="text-purple-200 ml-2">${result.reply}</div>`;
+                
+                // Apply changes
+                state.seats += result.seatsChange || 0;
+                state.morale += result.moraleChange || 0;
+                state.budget += result.budgetChange || 0;
+                state.intl += result.intlChange || 0;
+                if(result.log) addLog(result.log, 'purple');
+                
+                updateUI();
+            } catch (err) {
+                document.getElementById(loadingId).innerText = "Error: Comms link severed. Try again.";
+            } finally {
+                state.awaitingAI = false;
+                comms.scrollTop = comms.scrollHeight;
+            }
+        }
+
+        function orderStrike(type) {
+            if (type === 'precise') {
+                state.budget -= 0.2;
+                state.intl -= 3;
+                addLog("Precise strike confirmed.", "red");
+            } else if (type === 'recon') {
+                state.budget -= 0.1;
+                state.reconActive = true;
+                const marker = document.getElementById('intel-marker');
+                marker.style.top = (20 + Math.random() * 50) + '%';
+                marker.style.left = (30 + Math.random() * 40) + '%';
+                marker.classList.remove('hidden');
+                addLog("UAV Recon: Enemy tunnel entrance identified.", "yellow");
+            }
+            updateUI();
+        }
+
+        function nextDay() {
+            state.day++;
+            state.budget -= 0.1;
+            state.morale -= 1;
+            document.getElementById('intel-marker').classList.add('hidden');
+            state.reconActive = false;
+            
+            addLog(`Day ${state.day} briefing loaded.`);
+            refreshCabinet();
+            updateUI();
+        }
+
+        function refreshCabinet() {
+            const advice = [
+                { id: 'tax', role: 'Finance', text: 'Raise taxes? (+Budget, -Morale)', effect: () => { state.budget += 1; state.morale -= 8; } },
+                { id: 'deal', role: 'Mossad', text: 'Secret negotiation? (+Intl, -Seats)', effect: () => { state.intl += 10; state.seats -= 2; } }
+            ];
+            const pick = advice[Math.floor(Math.random() * advice.length)];
+            const container = document.getElementById('cabinet-container');
+            container.innerHTML = `
+                <div class="bg-slate-800 p-2 rounded text-[10px] border border-white/10">
+                    <div class="text-sky-400 font-bold mb-1">${pick.role.toUpperCase()}</div>
+                    <div class="mb-2 italic">${pick.text}</div>
+                    <button onclick="applyCabinet('${pick.id}')" class="bg-sky-600 px-2 py-1 rounded">Approve</button>
+                </div>
+            `;
+            window.currentAdvice = advice;
+        }
+
+        function applyCabinet(id) {
+            const item = window.currentAdvice.find(a => a.id === id);
+            item.effect();
+            document.getElementById('cabinet-container').innerHTML = `<p class="text-[10px] text-slate-500 italic">Processing...</p>`;
+            updateUI();
+        }
+
+        function endGame(reason) {
+            state.isGameOver = true;
+            document.getElementById('game-over-reason').innerText = reason;
+            document.getElementById('game-over').classList.remove('hidden');
+        }
+
+        updateUI();
+        refreshCabinet();
+    </script>
+</body>
+</html>
